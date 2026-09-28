@@ -1,0 +1,13 @@
+# Compiled class files and Maven build folder
+target/
+*.class
+*.war
+
+# IntelliJ IDEA configuration files
+.idea/
+*.iml
+.smarttomcat/
+
+# OS generated files
+.DS_Store
+Thumbs.db

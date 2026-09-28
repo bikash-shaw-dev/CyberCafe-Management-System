@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Cafe Accounting Manager</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; color: #333; }
+        .dashboard-card { background: white; padding: 25px; border-radius: 8px; width: 420px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; color: #0056b3; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 6px; font-weight: bold; font-size: 14px; }
+        input[type="text"], input[type="number"], select { width: 100%; padding: 9px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .hint { font-size: 12px; color: #666; margin-top: 4px; }
+        button { background-color: #0056b3; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: #004494; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-card">
+    <h2>Record a New Sale</h2>
+
+    <!-- Submits form data to SaveSaleServlet via HTTP POST -->
+    <!--suppress HtmlUnknownTarget -->
+    <form action="SaveSaleServlet" method="POST">
+
+        <!-- Income Category Selection -->
+        <div class="form-group">
+            <label for="category">Income Source (Category):</label>
+            <select name="category" id="category" required>
+                <option value="PC Gaming & Browsing">PC Gaming & Browsing</option>
+                <option value="Printing & Scanning">Printing & Scanning</option>
+                <option value="Online Form Filling">Online Form Filling</option>
+                <option value="Snacks & Beverages">Snacks & Beverages</option>
+            </select>
+        </div>
+
+        <!-- Payment Account Selection (Used for Paid Walk-ins) -->
+        <div class="form-group">
+            <label for="accountType">Payment Received In:</label>
+            <select name="accountType" id="accountType">
+                <option value="Cash in Hand">Cash in Hand (Drawer)</option>
+                <option value="Bank">Bank Account (UPI / Online)</option>
+            </select>
+        </div>
+
+        <!-- Debtor Name Input -->
+        <div class="form-group">
+            <label for="customerName">Debtor Name (For Credit):</label>
+            <input type="text" name="customerName" id="customerName" placeholder="e.g., Rahul Sharma">
+            <div class="hint">Leave blank if the customer is paying immediately.</div>
+        </div>
+
+        <!-- Sale Amount Input -->
+        <div class="form-group">
+            <label for="amount">Amount (₹):</label>
+            <input type="number" name="amount" id="amount" step="0.01" min="1" placeholder="Enter amount" required>
+        </div>
+
+        <button type="submit">Save Transaction</button>
+    </form>
+</div>
+
+</body>
+</html>
