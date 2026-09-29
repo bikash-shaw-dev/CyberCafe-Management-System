@@ -32,5 +32,11 @@
             <version>6.0.0</version>
             <scope>provided</scope>
         </dependency>
+        <!-- PostgreSQL JDBC Driver: Connects Java to Supabase Cloud -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.4</version>
+        </dependency>
     </dependencies>
 </project>

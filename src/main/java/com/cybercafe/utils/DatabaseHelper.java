@@ -5,31 +5,29 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 
 /**
- * Utility class responsible for managing the connection to the local MySQL database.
+ * Utility class responsible for managing the connection to the Supabase PostgreSQL cloud database.
  */
 public class DatabaseHelper {
 
-    // Default XAMPP MySQL connection parameters
-    private static final String URL = "jdbc:mysql://localhost:3306/cybercafe_db";
-    private static final String USER = "root";
-    private static final String PASSWORD = "";
+    // Reads the hidden URL from your server environment instead of hardcoding it
+    private static final String URL = System.getenv("SUPABASE_DB_URL");
 
-    /**
-     * Establishes and returns a connection to the MySQL database.
-     * @return Connection object, or null if connection fails.
-     */
     public static Connection getConnection() {
         Connection conn = null;
         try {
-            // Load the MySQL JDBC driver into memory
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            // Open the connection to the database
-            conn = DriverManager.getConnection(URL, USER, PASSWORD);
+            if (URL == null || URL.isEmpty()) {
+                System.err.println("ERROR: SUPABASE_DB_URL environment variable is missing!");
+                return null;
+            }
+
+            Class.forName("org.postgresql.Driver");
+            conn = DriverManager.getConnection(URL);
+
         } catch (ClassNotFoundException e) {
-            System.err.println("Error: MySQL JDBC Driver not found!");
+            System.err.println("Error: PostgreSQL JDBC Driver not found!");
             e.printStackTrace();
         } catch (SQLException e) {
-            System.err.println("Error: Could not connect to cybercafe_db! Is XAMPP MySQL running?");
+            System.err.println("Error: Could not connect to Supabase Cloud Database!");
             e.printStackTrace();
         }
         return conn;
