@@ -38,6 +38,11 @@
             font-size: 0.9rem;
             color: var(--muted);
         }
+        .hint {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-top: 0.2rem;
+        }
         input, select, button {
             width: 100%;
             padding: 0.75rem;
@@ -72,12 +77,6 @@
 <div class="card">
     <h2>Record New Sale</h2>
     <form id="saleForm">
-        <label for="customerName">Customer Name</label>
-        <input type="text" id="customerName" name="customerName" placeholder="Walk-in Customer" required>
-
-        <label for="customerPhone">Phone Number</label>
-        <input type="text" id="customerPhone" name="customerPhone" placeholder="9876543210" required>
-
         <label for="category">Service Category</label>
         <select id="category" name="category" required>
             <option value="Printing & Scanning">Printing & Scanning</option>
@@ -86,15 +85,18 @@
             <option value="Lamination & Binding">Lamination & Binding</option>
         </select>
 
-        <label for="totalAmount">Total Amount (₹)</label>
-        <input type="number" step="0.01" id="totalAmount" name="totalAmount" placeholder="150.00" required>
+        <label for="amount">Total Amount (₹)</label>
+        <input type="number" step="0.01" id="amount" name="amount" placeholder="50.00" required>
 
-        <label for="paymentStatus">Payment Method / Status</label>
-        <select id="paymentStatus" name="paymentStatus" required>
-            <option value="Cash in Hand">Paid - Cash in Hand</option>
-            <option value="Bank">Paid - UPI / Bank</option>
-            <option value="Pending">Credit (Udhaar / Unpaid)</option>
+        <label for="accountType">Payment Account (For Paid Walk-in Sales)</label>
+        <select id="accountType" name="accountType" required>
+            <option value="Cash in Hand">Cash in Hand</option>
+            <option value="Bank">Bank / UPI</option>
         </select>
+
+        <label for="customerName">Customer Name (Optional — For Credit / Udhaar Only)</label>
+        <input type="text" id="customerName" name="customerName" placeholder="Leave blank if paid now">
+        <div class="hint">Leave empty for instant paid walk-in sales. Enter a name only to record unpaid credit (Udhaar).</div>
 
         <button type="submit" id="submitBtn">Save Transaction</button>
     </form>
