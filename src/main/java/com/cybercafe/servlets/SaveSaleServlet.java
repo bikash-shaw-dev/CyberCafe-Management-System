@@ -11,121 +11,91 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
 
-/**
- * Servlet that processes new sales from the dashboard and executes double-entry accounting logic.
- */
-@WebServlet("/SaveSaleServlet")
+@WebServlet("/SaveSale")
 public class SaveSaleServlet extends HttpServlet {
-
-    // Optional health-check when opening /SaveSaleServlet directly in a browser
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        response.setContentType("application/json");
-        response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"status\":\"online\",\"message\":\"SaveSaleServlet API is live. Submit the form via POST to record sales.\"}");
-    }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
+        String category = request.getParameter("category");
+        String customerName = request.getParameter("customerName");
+        String paymentStatus = request.getParameter("paymentStatus");
+        String narration = request.getParameter("narration");
+        String amountStr = request.getParameter("amount");
+
+        double amount;
         try {
-            // 1. Extract form inputs using HTML 'name' attributes
-            String category = request.getParameter("category");
-            String customerName = request.getParameter("customerName");
-            String accountType = request.getParameter("accountType"); // 'Cash in Hand' or 'Bank'
-            String amountStr = request.getParameter("amount");
-
-            if (amountStr == null || amountStr.trim().isEmpty()) {
-                throw new IllegalArgumentException("Missing 'amount' parameter from form submission.");
+            amount = Double.parseDouble(amountStr);
+            if (amount <= 0) {
+                throw new NumberFormatException("Amount must be positive.");
             }
-            double amount = Double.parseDouble(amountStr.trim());
+        } catch (Exception e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("{\"status\":\"error\",\"message\":\"Invalid sale amount provided.\"}");
+            return;
+        }
 
-            // Determine if this is a Walk-in Paid Sale or a Credit (Debtor) Sale
-            boolean isCreditSale = (customerName != null && !customerName.trim().isEmpty());
-            String paymentStatus = isCreditSale ? "Unpaid" : "Paid";
+        if ("Unpaid".equalsIgnoreCase(paymentStatus) && (customerName == null || customerName.trim().isEmpty())) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("{\"status\":\"error\",\"message\":\"Customer name is required for Accounts Receivable (A/R) transactions.\"}");
+            return;
+        }
 
-            try (Connection conn = DatabaseHelper.getConnection()) {
-                if (conn == null) {
-                    throw new SQLException("Database connection is null. Verify SUPABASE_DB_URL environment variable.");
-                }
+        // Map payment status to the target Debit Ledger Account
+        String debitAccountName;
+        if ("Cash".equalsIgnoreCase(paymentStatus)) {
+            debitAccountName = "Cashbook";
+        } else if ("Online".equalsIgnoreCase(paymentStatus)) {
+            debitAccountName = "Bank A/c";
+        } else if ("Unpaid".equalsIgnoreCase(paymentStatus)) {
+            debitAccountName = "Debtors";
+        } else {
+            debitAccountName = "Cashbook";
+        }
 
-                // Disable auto-commit to ensure both sides of the double-entry succeed together
-                conn.setAutoCommit(false);
+        // Build readable ledger particulars
+        StringBuilder description = new StringBuilder();
+        description.append(category != null && !category.trim().isEmpty() ? category.trim() : "Service Sale");
+        if (customerName != null && !customerName.trim().isEmpty()) {
+            description.append(" - ").append(customerName.trim());
+        }
+        if (narration != null && !narration.trim().isEmpty()) {
+            description.append(" (").append(narration.trim()).append(")");
+        }
 
-                try {
-                    Integer customerId = null;
-                    CustomerManager customerManager = new CustomerManager();
-
-                    // 2. If a customer name was entered, find or create their Debtor profile
-                    if (isCreditSale) {
-                        customerId = customerManager.getOrCreateCustomer(conn, customerName.trim());
-                    }
-
-                    // 3. CREDIT ENTRY: Record the revenue in the Sales table
-                    String saleSql = "INSERT INTO Sales (customer_id, category, total_amount, payment_status) VALUES (?, ?, ?, ?)";
-                    int saleId = 0;
-
-                    try (PreparedStatement saleStmt = conn.prepareStatement(saleSql, Statement.RETURN_GENERATED_KEYS)) {
-                        if (customerId != null) {
-                            saleStmt.setInt(1, customerId);
-                        } else {
-                            saleStmt.setNull(1, Types.INTEGER); // Walk-in customer
-                        }
-                        saleStmt.setString(2, category);
-                        saleStmt.setDouble(3, amount);
-                        saleStmt.setString(4, paymentStatus);
-                        saleStmt.executeUpdate();
-
-                        // Retrieve the generated sale_id for the Cashbook reference
-                        try (ResultSet rs = saleStmt.getGeneratedKeys()) {
-                            if (rs.next()) {
-                                saleId = rs.getInt(1);
-                            }
-                        }
-                    }
-
-                    // 4. DEBIT ENTRY: Route to Debtor Balance (if credit) OR Cashbook (if paid now)
-                    if (isCreditSale) {
-                        customerManager.addCustomerDebt(conn, customerId, amount);
-                        System.out.println("Credit Sale Recorded: ₹" + amount + " added to " + customerName + "'s tab.");
-                    } else {
-                        String cashSql = "INSERT INTO Cashbook (account_type, transaction_type, amount, reference_id, description) VALUES (?, 'Income', ?, ?, ?)";
-                        try (PreparedStatement cashStmt = conn.prepareStatement(cashSql)) {
-                            cashStmt.setString(1, accountType);
-                            cashStmt.setDouble(2, amount);
-                            cashStmt.setInt(3, saleId);
-                            cashStmt.setString(4, "Walk-in sale: " + category);
-                            cashStmt.executeUpdate();
-                        }
-                        System.out.println("Paid Sale Recorded: ₹" + amount + " added to " + accountType);
-                    }
-
-                    // Commit the double-entry transaction to the database
-                    conn.commit();
-
-                    // 5. Return a clean JSON success response to the cloud frontend
-                    response.setStatus(HttpServletResponse.SC_OK);
-                    response.getWriter().write("{\"status\":\"success\",\"message\":\"Transaction saved to Supabase Cloud!\"}");
-
-                } catch (SQLException ex) {
-                    conn.rollback();
-                    throw ex;
-                }
+        try (Connection conn = DatabaseHelper.getConnection()) {
+            // 1. Record Double-Entry Transaction: Dr Cashbook/Bank/Debtors, Cr Sales A/c
+            String ledgerSql = "INSERT INTO Transactions (debit_account_id, credit_account_id, amount, description, status) " +
+                    "VALUES ((SELECT account_id FROM Accounts WHERE account_name = ?), " +
+                    "(SELECT account_id FROM Accounts WHERE account_name = 'Sales A/c'), ?, ?, 'ACTIVE')";
+            try (PreparedStatement stmt = conn.prepareStatement(ledgerSql)) {
+                stmt.setString(1, debitAccountName);
+                stmt.setDouble(2, amount);
+                stmt.setString(3, description.toString());
+                stmt.executeUpdate();
             }
+
+            // 2. If Accounts Receivable, upsert into Customers table
+            if ("Unpaid".equalsIgnoreCase(paymentStatus)) {
+                CustomerManager.addCustomerDebt(conn, customerName, amount);
+            }
+
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().write(
+                    "{\"status\":\"success\",\"message\":\"Sale recorded and posted to ledger.\",\"data\":{" +
+                            "\"category\":\"" + CustomerManager.escapeJson(category) + "\"," +
+                            "\"amount\":" + String.format("%.2f", amount) + "," +
+                            "\"debitAccount\":\"" + CustomerManager.escapeJson(debitAccountName) + "\"" +
+                            "}}"
+            );
 
         } catch (Exception e) {
-            System.err.println("Database transaction failed!");
             e.printStackTrace();
-            String safeMsg = (e.getMessage() != null) ? e.getMessage().replace("\"", "'") : e.toString();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write("{\"status\":\"error\",\"message\":\"" + safeMsg + "\"}");
+            response.getWriter().write("{\"status\":\"error\",\"message\":\"Database error: " + CustomerManager.escapeJson(e.getMessage()) + "\"}");
         }
     }
 }
