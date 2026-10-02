@@ -2,151 +2,644 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Cafe Management System</title>
-    <!-- Supabase Auth JS SDK -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Counter Ledger — Cyber Cafe Cloud</title>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Zilla+Slab:ital,wght@0,600;1,600&family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Supabase Auth JS SDK v2 & Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
+        /* ---------- LIGHT — "Day Ledger" ---------- */
         :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --accent: #10b981;
-            --danger: #ef4444;
-            --text: #f8fafc;
-            --muted: #94a3b8;
+            --paper: #f4eee0;
+            --paper-raised: #fcfaf5;
+            --ink: #1a252f;
+            --ink-soft: #7a7061;
+            --rule: #d3c7a9;
+            --margin: #c84b5c;
+            --cash: #2b7a5a;
+            --bank: #b8860b;
+            --debt: #c84b5c;
+            --loan: #4361ee;
+            --shadow: rgba(26, 37, 47, 0.12);
+            --stamp: rgba(200, 75, 92, 0.15);
+            --highlight: rgba(43, 122, 90, 0.1);
         }
+
+        /* ---------- DARK — "Lamp-lit Ledger" ---------- */
+        body.dark-mode {
+            --paper: #181612;
+            --paper-raised: #221f19;
+            --ink: #f0ead6;
+            --ink-soft: #a19782;
+            --rule: #3a3426;
+            --margin: #e06c7d;
+            --cash: #4caf82;
+            --bank: #d4a373;
+            --debt: #e06c7d;
+            --loan: #778bf4;
+            --shadow: rgba(0, 0, 0, 0.7);
+            --stamp: rgba(224, 108, 125, 0.12);
+            --highlight: rgba(76, 175, 130, 0.15);
+        }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
             margin: 0;
-            padding: 1rem;
+            padding: 40px 5vw 80px;
+            min-height: 100vh;
+            color: var(--ink);
+            font-family: 'Inter', sans-serif;
+            position: relative;
+            z-index: 1;
+            transition: color 0.8s ease;
         }
-        .card {
-            background: var(--card);
-            padding: 2rem;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 440px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+
+        /* --- THE CROSSFADE BACKGROUND TRICK --- */
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f4eee0;
+            background-image: linear-gradient(#e6dfcb 1px, transparent 1px), linear-gradient(90deg, #e6dfcb 1px, transparent 1px);
+            background-size: 40px 40px; z-index: -2;
         }
-        .header-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.5rem;
+
+        body::after {
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #181612;
+            background-image: linear-gradient(#2c271c 1px, transparent 1px), linear-gradient(90deg, #2c271c 1px, transparent 1px);
+            background-size: 40px 40px; z-index: -1;
+            opacity: 0; transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        h2 { margin: 0; color: var(--accent); }
-        label {
-            display: block;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-            color: var(--muted);
+        body.dark-mode::after { opacity: 1; }
+
+        /* --- ANIMATIONS --- */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .hint {
-            font-size: 0.78rem;
-            color: #64748b;
-            margin-top: 0.2rem;
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
-        input, select, button {
-            width: 100%;
-            padding: 0.75rem;
-            margin-top: 0.35rem;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #0f172a;
-            color: var(--text);
-            font-size: 1rem;
-            box-sizing: border-box;
+
+        /* --- TOAST NOTIFICATION --- */
+        #toastNotification {
+            position: fixed; bottom: 30px; right: 30px; z-index: 9999;
+            background: var(--ink); color: var(--paper);
+            border-left: 6px solid var(--cash);
+            padding: 14px 24px; border-radius: 4px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.9em; font-weight: 600;
+            box-shadow: 0 12px 24px var(--shadow);
+            opacity: 0; transform: translateY(20px); pointer-events: none;
+            transition: all 0.3s ease;
         }
-        button {
-            margin-top: 1.5rem;
-            background: var(--accent);
-            color: #064e3b;
-            font-weight: 700;
-            border: none;
-            cursor: pointer;
-            transition: opacity 0.2s;
+        #toastNotification.show { opacity: 1; transform: translateY(0); }
+        #toastNotification.error { border-left-color: var(--margin); }
+
+        /* --- OWNER LOGIN SECTION --- */
+        #loginSection {
+            max-width: 440px; margin: 70px auto;
+            animation: slideUp 0.6s ease-out;
         }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-        .logout-btn {
-            width: auto;
-            margin-top: 0;
-            padding: 0.4rem 0.75rem;
-            font-size: 0.8rem;
-            background: transparent;
-            color: var(--muted);
-            border: 1px solid #334155;
+        .login-subtitle {
+            text-align: center; font-family: 'Caveat', cursive;
+            font-size: 1.7em; color: var(--margin); margin: -20px 0 25px;
         }
-        .logout-btn:hover {
-            color: var(--danger);
-            border-color: var(--danger);
+        .login-error {
+            background: var(--stamp); color: var(--margin);
+            border: 1px dashed var(--margin); padding: 10px 14px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.85em;
+            margin-bottom: 20px; display: none; text-align: center;
         }
-        .status-box {
-            margin-top: 1rem;
-            padding: 0.75rem;
-            border-radius: 8px;
-            display: none;
-            font-size: 0.9rem;
+
+        /* --- LETTERHEAD & NAVIGATION --- */
+        .letterhead {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-bottom: 40px; padding-bottom: 20px;
+            border-bottom: 4px double var(--ink);
+            animation: fadeIn 0.8s ease-out; transition: border-color 0.8s ease;
+            flex-wrap: wrap; gap: 20px;
         }
-        #dashboardSection { display: none; }
+        .letterhead h1 { font-family: 'Zilla Slab', serif; font-weight: 600; font-size: 2.8em; margin: 0; letter-spacing: 0.5px; }
+        .letterhead .handwritten {
+            font-family: 'Caveat', cursive; font-size: 1.8em; color: var(--margin);
+            transform: rotate(-3deg); display: inline-block; margin-left: 10px;
+            transition: color 0.8s ease;
+        }
+        .letterhead-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+        /* --- BUTTONS --- */
+        .btn-toggle {
+            background: transparent; color: var(--ink); border: 2px solid var(--ink);
+            padding: 10px 16px; border-radius: 4px; cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.85em; font-weight: 600;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .btn-toggle:hover { background: var(--ink); color: var(--paper); transform: translateY(-2px); }
+        .btn-toggle.pressing { transform: translateY(2px) scale(0.96); opacity: 0; }
+
+        .btn-nav {
+            background: var(--paper-raised); color: var(--ink); border: 2px solid var(--ink);
+            padding: 10px 18px; border-radius: 4px; cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 0.88em;
+            box-shadow: 3px 3px 0 var(--rule);
+            transition: all 0.2s ease;
+        }
+        .btn-nav:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--margin); }
+        .btn-nav.active-nav {
+            background: var(--ink); color: var(--paper);
+            box-shadow: 4px 4px 0 var(--margin);
+        }
+
+        .btn-logout {
+            background: transparent; color: var(--margin); border: 2px dashed var(--margin);
+            padding: 10px 16px; border-radius: 4px; cursor: pointer;
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.85em; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-logout:hover { background: var(--margin); color: var(--paper-raised); border-style: solid; }
+
+        /* --- SPA VIEW CONTAINERS --- */
+        .spa-view { display: none; animation: fadeIn 0.4s ease-out; }
+        .spa-view.active-view { display: block; }
+
+        /* --- COUNTER SPREAD & JAGGED RECEIPT SLIPS --- */
+        .spread {
+            display: grid; grid-template-columns: minmax(320px, 1fr) 2px minmax(420px, 1.5fr);
+            gap: 40px; align-items: start;
+        }
+        .fold {
+            background: linear-gradient(180deg, transparent, var(--rule), transparent);
+            width: 2px; align-self: stretch; opacity: 0.5; transition: background 0.8s ease;
+        }
+
+        .slip-wrapper { filter: drop-shadow(0 15px 25px var(--shadow)); transition: filter 0.8s ease; }
+        .slip {
+            background: var(--paper-raised); padding: 40px 35px 60px; position: relative;
+            clip-path: polygon(
+                    0% 0%, 100% 0%, 100% 96%, 96% 100%, 92% 96%, 88% 100%, 84% 96%, 80% 100%,
+                    76% 96%, 72% 100%, 68% 96%, 64% 100%, 60% 96%, 56% 100%, 52% 96%, 48% 100%,
+                    44% 96%, 40% 100%, 36% 96%, 32% 100%, 28% 96%, 24% 100%, 20% 96%, 16% 100%,
+                    12% 96%, 8% 100%, 4% 96%, 0% 100%
+            );
+            transition: background 0.8s ease;
+        }
+        .slip::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0;
+            border-top: 3px dashed var(--rule); transition: border-color 0.8s ease;
+        }
+        .slip h2 { font-family: 'Zilla Slab', serif; font-style: italic; font-weight: 600; font-size: 1.6em; margin: 0 0 30px; text-align: center; }
+
+        .field { margin-bottom: 25px; position: relative; }
+        .field label { display: inline-block; font-size: 0.85em; color: var(--ink-soft); font-weight: 500; width: 35%; transition: color 0.8s ease; }
+        .field select, .field input {
+            width: 60%; padding: 5px 0; border: none; border-bottom: 2px dotted var(--ink-soft);
+            background: transparent; color: var(--ink); border-radius: 0;
+            font-family: 'IBM Plex Mono', monospace; font-size: 1em; font-weight: 500;
+            transition: border-color 0.3s, color 0.8s ease;
+        }
+        .field select { cursor: pointer; }
+        .field select:focus, .field input:focus { outline: none; border-bottom: 2px solid var(--ink); }
+        .field input::placeholder { font-family: 'Caveat', cursive; font-size: 1.2em; color: var(--ink-soft); opacity: 0.5; }
+
+        .btn-record {
+            width: 100%; background: transparent; color: var(--ink); border: 2px dashed var(--ink);
+            padding: 15px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 1.05em;
+            text-transform: uppercase; letter-spacing: 2px; cursor: pointer; margin-top: 15px;
+            transition: background 0.2s, border-color 0.8s, color 0.8s;
+        }
+        .btn-record:hover { background: var(--ink); color: var(--paper); border-style: solid; }
+        .btn-record.loan-btn { color: var(--bank); border-color: var(--bank); }
+        .btn-record.loan-btn:hover { background: var(--bank); color: var(--paper-raised); border-style: solid; }
+
+        /* --- FINANCIAL OVERVIEW CARD --- */
+        .ledger {
+            background: var(--paper-raised); padding: 40px; border: 1px solid var(--rule);
+            box-shadow: 0 15px 30px var(--shadow); position: relative; overflow: hidden;
+            transition: background 0.8s ease, border-color 0.8s ease, box-shadow 0.8s ease;
+        }
+        .ledger::after {
+            content: 'AUDITED'; position: absolute; top: 20%; right: -20px;
+            font-family: 'IBM Plex Mono', monospace; font-size: 6em; font-weight: 600;
+            color: var(--stamp); transform: rotate(-15deg); pointer-events: none;
+        }
+        .ledger h2 {
+            font-family: 'Zilla Slab', serif; font-weight: 600; font-size: 1.5em; margin: 0 0 30px;
+            border-bottom: 1px solid var(--rule); padding-bottom: 10px;
+        }
+        .ledger-body {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 40px;
+            align-items: start; position: relative; z-index: 2;
+        }
+        .chart-col-title {
+            text-align: center; font-family: 'Caveat', cursive; color: var(--ink-soft);
+            font-size: 1.6em; margin: 0 0 15px 0;
+        }
+        .chart-wrap { position: relative; max-width: 230px; margin: 0 auto; filter: drop-shadow(0 8px 16px var(--shadow)); }
+        .center-total { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+        .center-total .label { font-family: 'Caveat', cursive; font-size: 1.5em; color: var(--ink-soft); line-height: 0.8; }
+        .center-total .value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 1.2em; color: var(--ink); }
+
+        .rows { border-left: 2px dotted var(--margin); padding-left: 20px; margin-top: 25px; }
+        .rows.loan-rows { border-left-color: var(--loan); }
+        .row { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 0; border-bottom: 1px solid var(--rule); }
+        .row:last-child { border-bottom: none; }
+        .row .tag { font-size: 0.95em; font-weight: 500; display: flex; align-items: center; }
+        .row .amt { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 1.1em; }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; }
+
+        /* --- GENERAL LEDGER VIEW --- */
+        .control-slip {
+            background: var(--paper-raised); padding: 25px 30px; margin-bottom: 35px;
+            box-shadow: 0 10px 20px var(--shadow); border: 1px solid var(--rule);
+        }
+        .control-slip h4 { font-family: 'Zilla Slab', serif; font-size: 1.3em; margin: 0 0 15px 0; font-weight: 600; }
+        .checkbox-grid { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 22px; }
+        .checkbox-label { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 0.92em; cursor: pointer; color: var(--ink-soft); }
+        .checkbox-label:hover { color: var(--ink); }
+        .checkbox-label input { accent-color: var(--ink); width: 16px; height: 16px; cursor: pointer; }
+
+        .mode-buttons { display: flex; gap: 15px; flex-wrap: wrap; }
+        .btn-mode {
+            background: transparent; border: 2px dashed var(--ink-soft); color: var(--ink-soft);
+            padding: 10px 20px; border-radius: 4px; font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-mode:hover { border-style: solid; color: var(--ink); border-color: var(--ink); }
+        .btn-mode.active { background: var(--ink); color: var(--paper); border: 2px solid var(--ink); }
+
+        .adjustment-warning {
+            background: var(--stamp); color: var(--margin); padding: 15px; text-align: center;
+            font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 0.9em;
+            border: 2px dashed var(--margin); margin-bottom: 30px; letter-spacing: 1px; display: none;
+        }
+
+        .admin-panel {
+            background: var(--stamp); padding: 22px; border: 2px dashed var(--margin);
+            margin-bottom: 30px; border-radius: 4px; display: none;
+        }
+        .admin-panel h4 { margin: 0 0 15px 0; font-family: 'Zilla Slab', serif; color: var(--margin); font-size: 1.3em; }
+        .admin-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+        .admin-input {
+            padding: 10px; border: 1px solid var(--margin); background: var(--paper-raised);
+            color: var(--ink); font-family: 'IBM Plex Mono', monospace; flex: 1; min-width: 160px;
+        }
+        .admin-btn {
+            background: var(--margin); color: var(--paper-raised); border: none;
+            padding: 10px 24px; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        .table-responsive { overflow-x: auto; margin-bottom: 50px; filter: drop-shadow(0 15px 25px var(--shadow)); }
+        .ledger-table { width: 100%; min-width: 820px; border-collapse: collapse; background: var(--paper-raised); border: 1px solid var(--rule); }
+        .account-header {
+            background: var(--paper-raised); border: 1px solid var(--rule); border-bottom: none;
+            padding: 18px 22px; display: flex; justify-content: space-between; align-items: center;
+            font-family: 'Zilla Slab', serif; font-size: 1.55em; font-weight: 600;
+        }
+        .dr-cr { font-family: 'Caveat', cursive; font-size: 1.2em; color: var(--ink-soft); }
+        .ledger-table th {
+            border-bottom: 3px double var(--rule); border-top: 1px solid var(--rule);
+            padding: 12px 10px; text-align: left; font-size: 0.82em; color: var(--ink-soft);
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+        .ledger-table td {
+            padding: 12px 10px; border-bottom: 1px dotted var(--rule);
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.92em; vertical-align: top;
+        }
+        .center-fold { border-left: 4px double var(--rule) !important; }
+        .margin-line { border-left: 2px solid var(--margin) !important; }
+        .particulars-col { font-family: 'Inter', sans-serif !important; font-weight: 500; min-width: 180px; }
+        .amount-col { font-weight: 600; }
+        .bank-col { color: var(--bank); }
+        .void-btn {
+            background: transparent; border: 1px solid var(--margin); color: var(--margin);
+            font-family: 'IBM Plex Mono', monospace; font-size: 0.75em; padding: 2px 6px;
+            cursor: pointer; margin-left: 8px; border-radius: 3px;
+        }
+        .void-btn:hover { background: var(--margin); color: var(--paper-raised); }
+
+        /* --- ACCOUNTS RECEIVABLE & LOANS GRIDS --- */
+        .cards-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 28px; margin-top: 20px;
+        }
+        .account-card {
+            background: var(--paper-raised); border: 1px solid var(--rule);
+            border-top: 6px solid var(--debt); padding: 25px;
+            box-shadow: 0 10px 20px var(--shadow);
+        }
+        .account-card.loan-card { border-top-color: var(--bank); }
+        .card-name { font-family: 'Zilla Slab', serif; font-size: 1.5em; font-weight: 600; margin: 0 0 8px 0; }
+        .card-amount { font-family: 'IBM Plex Mono', monospace; font-size: 1.9em; color: var(--debt); font-weight: 600; margin: 0 0 20px 0; }
+        .account-card.loan-card .card-amount { color: var(--bank); }
+        .settle-form { display: flex; flex-direction: column; gap: 10px; }
+        .settle-input, .settle-select {
+            width: 100%; padding: 10px; border: 1px solid var(--rule);
+            background: transparent; color: var(--ink); font-family: 'IBM Plex Mono', monospace;
+        }
+        .btn-settle {
+            background: transparent; border: 2px dashed var(--debt); color: var(--debt);
+            padding: 12px; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+            cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+        }
+        .btn-settle:hover { background: var(--debt); color: var(--paper-raised); border-style: solid; }
+        .btn-settle.loan-settle { border-color: var(--bank); color: var(--bank); }
+        .btn-settle.loan-settle:hover { background: var(--bank); color: var(--paper-raised); border-style: solid; }
+        .empty-state {
+            text-align: center; grid-column: 1 / -1; font-family: 'Caveat', cursive;
+            font-size: 2.2em; color: var(--ink-soft); padding: 60px 0;
+        }
+
+        @media (max-width: 900px) {
+            .spread { grid-template-columns: 1fr; }
+            .fold { display: none; }
+            .ledger-body { grid-template-columns: 1fr; gap: 30px; }
+            .field label { width: 100%; display: block; margin-bottom: 5px; }
+            .field select, .field input { width: 100%; }
+        }
     </style>
 </head>
 <body>
 
-<!-- 1. OWNER LOGIN SECTION -->
-<div class="card" id="loginSection">
-    <h2>Owner Login</h2>
-    <p class="hint">Sign in with your Supabase administrator account to access the Cyber Cafe ledger.</p>
-    <form id="loginForm">
-        <label for="email">Admin Email</label>
-        <input type="email" id="email" placeholder="owner@cybercafe.com" required>
+<!-- GLOBAL TOAST FOR ASYNC FETCH FEEDBACK -->
+<div id="toastNotification"></div>
 
-        <label for="password">Password</label>
-        <input type="password" id="password" placeholder="••••••••" required>
+<!-- =================================================================== -->
+<!-- 1. UNAUTHENTICATED VIEW: SUPABASE OWNER LOGIN                       -->
+<!-- =================================================================== -->
+<div id="loginSection">
+    <div class="slip-wrapper">
+        <div class="slip">
+            <h2>Owner Authentication</h2>
+            <div class="login-subtitle">Counter Ledger Cloud</div>
+            <div id="loginError" class="login-error"></div>
 
-        <button type="submit" id="loginBtn">Sign In</button>
-    </form>
-    <div id="loginStatus" class="status-box"></div>
-</div>
-
-<!-- 2. PROTECTED SALE DASHBOARD SECTION -->
-<div class="card" id="dashboardSection">
-    <div class="header-row">
-        <h2>Record New Sale</h2>
-        <button type="button" class="logout-btn" id="logoutBtn">Sign Out</button>
+            <form id="loginForm">
+                <div class="field">
+                    <label>Owner Email</label>
+                    <input type="email" id="loginEmail" placeholder="owner@cybercafe.com" required>
+                </div>
+                <div class="field">
+                    <label>Passkey</label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="loginBtn" class="btn-record">Unlock Ledger</button>
+            </form>
+        </div>
     </div>
-    <form id="saleForm">
-        <label for="category">Service Category</label>
-        <select id="category" name="category" required>
-            <option value="Printing & Scanning">Printing & Scanning</option>
-            <option value="PC Gaming & Browsing">PC Gaming & Browsing</option>
-            <option value="Online Form Filling">Online Form Filling</option>
-            <option value="Lamination & Binding">Lamination & Binding</option>
-        </select>
-
-        <label for="amount">Total Amount (₹)</label>
-        <input type="number" step="0.01" id="amount" name="amount" placeholder="50.00" required>
-
-        <label for="accountType">Payment Account (For Paid Walk-in Sales)</label>
-        <select id="accountType" name="accountType" required>
-            <option value="Cash in Hand">Cash in Hand</option>
-            <option value="Bank">Bank / UPI</option>
-        </select>
-
-        <label for="customerName">Customer Name (Optional — For Credit / Udhaar Only)</label>
-        <input type="text" id="customerName" name="customerName" placeholder="Leave blank if paid now">
-        <div class="hint">Leave empty for instant paid walk-in sales. Enter a name only to record unpaid credit (Udhaar).</div>
-
-        <button type="submit" id="submitBtn">Save Transaction</button>
-    </form>
-    <div id="statusMessage" class="status-box"></div>
 </div>
 
+<!-- =================================================================== -->
+<!-- 2. AUTHENTICATED VIEW: PROTECTED CLOUD DASHBOARD                    -->
+<!-- =================================================================== -->
+<div id="dashboardSection" style="display: none;">
+
+    <!-- SHARED LETTERHEAD & SPA NAVIGATION -->
+    <div class="letterhead">
+        <div>
+            <h1 id="pageMainTitle">Counter Ledger <span class="handwritten" id="pageSubTitle">Daily Record</span></h1>
+        </div>
+        <div class="letterhead-actions">
+            <button class="btn-toggle" onclick="toggleTheme()" id="themeBtn">Night Mode</button>
+            <button class="btn-nav active-nav" id="navCounter" onclick="switchView('counter')">🧾 Counter</button>
+            <button class="btn-nav" id="navLedger" onclick="switchView('ledger')">📖 Open Full Book</button>
+            <button class="btn-nav" id="navDebtors" onclick="switchView('debtors')">👥 Accounts Receivable</button>
+            <button class="btn-nav" id="navLoans" onclick="switchView('loans')">💸 Loans</button>
+            <button class="btn-logout" id="logoutBtn">Logout</button>
+        </div>
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- SUB-VIEW A: COUNTER LEDGER (RECEIPTS + DUAL CHARTS)             -->
+    <!-- =============================================================== -->
+    <div id="viewCounter" class="spa-view active-view">
+        <div class="spread">
+            <div class="slip-wrapper">
+                <!-- RECEIPT 1: RECORD SALE ENTRY -->
+                <div class="slip">
+                    <h2>Record Entry</h2>
+                    <form id="saleForm">
+                        <div class="field">
+                            <label>Service rendered</label>
+                            <select name="category" id="category">
+                                <option value="B&W Xerox">B&amp;W Xerox</option>
+                                <option value="Color Xerox">Color Xerox</option>
+                                <option value="B&W printout">B&amp;W printout</option>
+                                <option value="Color printout">Color printout</option>
+                                <option value="Frontpage">Frontpage</option>
+                                <option value="Index page">Index page</option>
+                                <option value="Photos printout(Whole page)">Photos (Whole)</option>
+                                <option value="Photos printout(Half page)">Photos (Half)</option>
+                                <option value="PC Time">PC Time</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label>Amount charged</label>
+                            <input type="number" step="0.01" name="amount" id="saleAmount" placeholder="₹" required>
+                        </div>
+
+                        <div class="field">
+                            <label>Customer name</label>
+                            <input type="text" name="customerName" id="customerName" placeholder="Walk-in">
+                        </div>
+
+                        <div class="field">
+                            <label>Payment method</label>
+                            <select name="paymentStatus" id="paymentStatus">
+                                <option value="Cash">Cash in Drawer</option>
+                                <option value="Online">Online / UPI</option>
+                                <option value="Unpaid">Accounts Receivable (A/R)</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label>Particulars</label>
+                            <input type="text" name="narration" id="saleNarration" placeholder="Additional notes...">
+                        </div>
+
+                        <button type="submit" class="btn-record">Stamp &amp; Post</button>
+                    </form>
+                </div>
+
+                <!-- RECEIPT 2: ISSUE CASH/BANK LOAN -->
+                <div class="slip" style="margin-top: 30px;">
+                    <h2 style="color: var(--bank);">Issue Loan</h2>
+                    <form id="loanForm">
+                        <div class="field">
+                            <label>Recipient name</label>
+                            <input type="text" name="personName" id="loanPersonName" placeholder="Borrower name" required>
+                        </div>
+
+                        <div class="field">
+                            <label>Amount given</label>
+                            <input type="number" step="0.01" name="amount" id="loanAmount" placeholder="₹" required>
+                        </div>
+
+                        <div class="field">
+                            <label>Payment method</label>
+                            <select name="paymentMethod" id="loanPaymentMethod" required>
+                                <option value="Cashbook">Cash in Drawer</option>
+                                <option value="Bank A/c">Bank Transfer (UPI)</option>
+                            </select>
+                        </div>
+
+                        <div class="field">
+                            <label>Particulars</label>
+                            <input type="text" name="narration" id="loanNarration" placeholder="Reason...">
+                        </div>
+
+                        <button type="submit" class="btn-record loan-btn">Authorize Loan</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="fold"></div>
+
+            <!-- RIGHT SIDE: DUAL CHART FINANCIAL OVERVIEW -->
+            <div class="ledger">
+                <h2>Financial Overview</h2>
+                <div class="ledger-body">
+
+                    <!-- CHART 1: SALES & RECEIVABLES -->
+                    <div>
+                        <h3 class="chart-col-title">Sales &amp; Receivables</h3>
+                        <div class="chart-wrap">
+                            <canvas id="revenueChart"></canvas>
+                            <div class="center-total">
+                                <div class="label">Gross</div>
+                                <div class="value" id="valGross">₹0.00</div>
+                            </div>
+                        </div>
+
+                        <div class="rows">
+                            <div class="row">
+                                <span class="tag"><span class="dot" style="background:var(--cash);"></span>Cash</span>
+                                <span class="amt" id="valCash">₹0.00</span>
+                            </div>
+                            <div class="row">
+                                <span class="tag"><span class="dot" style="background:var(--bank);"></span>Bank</span>
+                                <span class="amt" id="valBank">₹0.00</span>
+                            </div>
+                            <div class="row" style="color: var(--debt);">
+                                <span class="tag"><span class="dot" style="background:var(--debt);"></span>Total A/R (Unpaid)</span>
+                                <span class="amt" id="valDebt">₹0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CHART 2: LOANS & ADVANCES -->
+                    <div>
+                        <h3 class="chart-col-title">Loans &amp; Advances</h3>
+                        <div class="chart-wrap">
+                            <canvas id="loanChart"></canvas>
+                            <div class="center-total">
+                                <div class="label">Given</div>
+                                <div class="value" id="valLoansGiven">₹0.00</div>
+                            </div>
+                        </div>
+
+                        <div class="rows loan-rows">
+                            <div class="row" style="color: var(--cash);">
+                                <span class="tag"><span class="dot" style="background:var(--cash);"></span>Recovered</span>
+                                <span class="amt" id="valLoansRecovered">₹0.00</span>
+                            </div>
+                            <div class="row" style="color: var(--loan);">
+                                <span class="tag"><span class="dot" style="background:var(--loan);"></span>Outstanding</span>
+                                <span class="amt" id="valLoansOutstanding">₹0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- SUB-VIEW B: GENERAL LEDGER (FULL BOOK & ADMIN ADJUSTMENT MODE)  -->
+    <!-- =============================================================== -->
+    <div id="viewLedger" class="spa-view">
+        <div class="control-slip">
+            <h4>Select Folios to View</h4>
+            <div class="checkbox-grid" id="folioCheckboxGrid">
+                <!-- Populated dynamically from /Ledger -->
+            </div>
+            <div class="mode-buttons">
+                <button type="button" class="btn-mode active" id="btnStandardMode" onclick="setLedgerMode('view')">👁️ Standard View</button>
+                <button type="button" class="btn-mode" id="btnAdjustMode" onclick="setLedgerMode('adjustment')">⚙️ Adjustment Mode</button>
+                <button type="button" class="btn-mode" id="btnToggleManualEntry" style="display: none;" onclick="toggleManualEntryBox()">➕ Write Manual Entry</button>
+            </div>
+        </div>
+
+        <div id="adjustmentWarning" class="adjustment-warning">
+            [AUDIT UNLOCKED] — Proceed with caution. Discounts, manual journal entries, and voids are permanently logged.
+        </div>
+
+        <!-- MANUAL JOURNAL ENTRY PANEL (ADJUSTMENT MODE ONLY) -->
+        <div id="manualEntryBox" class="admin-panel" style="border-color: var(--ink); background: var(--highlight);">
+            <h4 style="color: var(--ink);">✍️ Record Manual Double-Entry Adjustment</h4>
+            <form id="manualEntryForm">
+                <div class="admin-row">
+                    <select name="debitAccount" id="manualDebitAcc" class="admin-input" style="border-color: var(--ink);" required></select>
+                    <select name="creditAccount" id="manualCreditAcc" class="admin-input" style="border-color: var(--ink);" required></select>
+                    <input type="number" step="0.01" name="amount" placeholder="Amount ₹" class="admin-input" style="border-color: var(--ink);" required>
+                </div>
+                <div class="admin-row">
+                    <input type="text" name="description" placeholder="Journal Narration / Audit Note" class="admin-input" style="border-color: var(--ink);" required>
+                    <button type="submit" class="admin-btn" style="background: var(--ink);">Post Journal Entry</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- OWNER DISCOUNT / WRITE-OFF TERMINAL (SHOWN IN ADJUSTMENT MODE WHEN DEBTORS IS SELECTED) -->
+        <div id="adminDiscountBox" class="admin-panel">
+            <h4>🎯 Apply Specific Discount / Write-Off</h4>
+            <form id="discountForm">
+                <div class="admin-row">
+                    <input type="text" name="customerName" placeholder="Customer Name (Required)" class="admin-input" required>
+                    <input type="number" step="0.01" name="discountAmount" placeholder="Amount ₹ (Required)" class="admin-input" required>
+                    <select name="discountReason" class="admin-input">
+                        <option value="">-- Select Reason (Optional) --</option>
+                        <option value="Rounding Off">Rounding Off Amount</option>
+                        <option value="Goodwill">To Increase Goodwill</option>
+                        <option value="Bulk Order">Bulk Order Incentive</option>
+                        <option value="Service Apology">Service Apology / Dispute</option>
+                        <option value="Special Case">Special Case (Specify below)</option>
+                    </select>
+                </div>
+                <div class="admin-row">
+                    <input type="date" name="saleDate" class="admin-input" style="flex: 0.5;">
+                    <input type="text" name="saleParticulars" placeholder="Ref: Specific Sale (e.g., Color Printout & Spiral Binding) - Optional" class="admin-input" style="flex: 1.5;">
+                    <button type="submit" class="admin-btn">Grant Discount</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- DYNAMIC LEDGER TABLES CONTAINER -->
+        <div id="ledgerTablesContainer"></div>
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- SUB-VIEW C: ACCOUNTS RECEIVABLE (CUSTOMER DUES)                 -->
+    <!-- =============================================================== -->
+    <div id="viewDebtors" class="spa-view">
+        <div id="debtorsGrid" class="cards-grid"></div>
+    </div>
+
+    <!-- =============================================================== -->
+    <!-- SUB-VIEW D: LOANS & ADVANCES (OUTSTANDING BORROWERS)            -->
+    <!-- =============================================================== -->
+    <div id="viewLoans" class="spa-view">
+        <div id="loansGrid" class="cards-grid"></div>
+    </div>
+
+</div>
+
+<!-- MAIN CLOUD APPLICATION LOGIC -->
 <script src="app.js"></script>
 </body>
 </html>
