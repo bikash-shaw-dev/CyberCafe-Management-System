@@ -4,11 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cyber Cafe Management System</title>
+    <!-- Supabase Auth JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --bg: #0f172a;
             --card: #1e293b;
             --accent: #10b981;
+            --danger: #ef4444;
             --text: #f8fafc;
             --muted: #94a3b8;
         }
@@ -31,7 +34,13 @@
             max-width: 440px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
-        h2 { margin-top: 0; color: var(--accent); }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        h2 { margin: 0; color: var(--accent); }
         label {
             display: block;
             margin-top: 1rem;
@@ -64,18 +73,53 @@
             transition: opacity 0.2s;
         }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
-        #statusMessage {
+        .logout-btn {
+            width: auto;
+            margin-top: 0;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid #334155;
+        }
+        .logout-btn:hover {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+        .status-box {
             margin-top: 1rem;
             padding: 0.75rem;
             border-radius: 8px;
             display: none;
             font-size: 0.9rem;
         }
+        #dashboardSection { display: none; }
     </style>
 </head>
 <body>
-<div class="card">
-    <h2>Record New Sale</h2>
+
+<!-- 1. OWNER LOGIN SECTION -->
+<div class="card" id="loginSection">
+    <h2>Owner Login</h2>
+    <p class="hint">Sign in with your Supabase administrator account to access the Cyber Cafe ledger.</p>
+    <form id="loginForm">
+        <label for="email">Admin Email</label>
+        <input type="email" id="email" placeholder="owner@cybercafe.com" required>
+
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" required>
+
+        <button type="submit" id="loginBtn">Sign In</button>
+    </form>
+    <div id="loginStatus" class="status-box"></div>
+</div>
+
+<!-- 2. PROTECTED SALE DASHBOARD SECTION -->
+<div class="card" id="dashboardSection">
+    <div class="header-row">
+        <h2>Record New Sale</h2>
+        <button type="button" class="logout-btn" id="logoutBtn">Sign Out</button>
+    </div>
     <form id="saleForm">
         <label for="category">Service Category</label>
         <select id="category" name="category" required>
@@ -100,7 +144,7 @@
 
         <button type="submit" id="submitBtn">Save Transaction</button>
     </form>
-    <div id="statusMessage"></div>
+    <div id="statusMessage" class="status-box"></div>
 </div>
 
 <script src="app.js"></script>
