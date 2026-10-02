@@ -2,7 +2,7 @@ const API_BASE_URL = "https://cybercafe-management-system.onrender.com";
 
 // Supabase Configuration (Project ID: hyrhegfoukbvjyyqobkh)
 const SUPABASE_URL = "https://hyrhegfoukbvjyyqobkh.supabase.co";
-const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_PUBLIC_KEY_HERE";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh5cmhlZ2ZvdWtidmp5eXFvYmtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2MTU1MTgsImV4cCI6MjEwNjE5MTUxOH0.nlkwuNmXSPbrM9LoRQqQJKFDDM7JSYZdiw5X5zRdnJU";
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
