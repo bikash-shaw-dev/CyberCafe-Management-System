@@ -17,7 +17,7 @@ public class JwtHelper {
         }
         
         String token = header.substring(7);
-        String secret = System.getenv("SUPABASE_JWT_SECRET");
+        String secret = "f746Jwi5ZjUf+pJ34ljlMBtzaWrLIxWydo6MyrGZ8P6gsmkG3k9Gx5B23sfRPau3Uqsbce6ktbEj3UyHmZnAYQ==";
         
         if (secret == null || secret.trim().isEmpty()) {
             System.err.println("JWT FATAL ERROR: SUPABASE_JWT_SECRET is missing in Render!");
