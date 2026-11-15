@@ -7,8 +7,6 @@ import com.auth0.jwt.interfaces.JWTVerifier;
 import jakarta.servlet.http.HttpServletRequest;
 
 public class JwtHelper {
-    // Fetches the secret you saved in the Render Environment Variables
-    private static final String SECRET = System.getenv("SUPABASE_JWT_SECRET");
 
     /**
      * Intercepts the Authorization header, verifies the Supabase token, 
@@ -18,17 +16,25 @@ public class JwtHelper {
         String header = request.getHeader("Authorization");
         
         if (header == null || !header.startsWith("Bearer ")) {
-            return null; // Missing or invalid header
+            System.err.println("JWT Error: Missing or invalid Authorization header.");
+            return null;
         }
         
         String token = header.substring(7); // Remove "Bearer " prefix
         
+        // Fetch secret dynamically at runtime to prevent Docker cold-start bugs
+        String secret = System.getenv("SUPABASE_JWT_SECRET");
+        
+        if (secret == null || secret.trim().isEmpty()) {
+            System.err.println("JWT FATAL ERROR: SUPABASE_JWT_SECRET environment variable is missing in Render!");
+            return null;
+        }
+        
         try {
-            Algorithm algorithm = Algorithm.HMAC256(SECRET);
+            Algorithm algorithm = Algorithm.HMAC256(secret);
             JWTVerifier verifier = JWT.require(algorithm).build();
             DecodedJWT jwt = verifier.verify(token);
             
-            // In Supabase, the user's UUID is always stored in the 'sub' (subject) claim
             return jwt.getSubject();
         } catch (Exception e) {
             System.err.println("JWT Verification Failed: " + e.getMessage());
