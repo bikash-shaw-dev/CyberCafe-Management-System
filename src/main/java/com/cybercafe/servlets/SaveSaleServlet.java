@@ -2,6 +2,7 @@ package com.cybercafe.servlets;
 
 import com.cybercafe.utils.CustomerManager;
 import com.cybercafe.utils.DatabaseHelper;
+import com.cybercafe.utils.JwtHelper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -20,77 +21,48 @@ public class SaveSaleServlet extends HttpServlet {
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
 
+        // MULTI-TENANT SECURITY CHECK
+        String adminId = JwtHelper.getAdminIdFromRequest(request);
+        if (adminId == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("{\"status\":\"error\",\"message\":\"Unauthorized. Invalid or missing authentication token.\"}");
+            return;
+        }
+
         String category = request.getParameter("category");
         String customerName = request.getParameter("customerName");
         String paymentStatus = request.getParameter("paymentStatus");
         String narration = request.getParameter("narration");
-        String amountStr = request.getParameter("amount");
+        double amount = Double.parseDouble(request.getParameter("amount"));
 
-        double amount;
-        try {
-            amount = Double.parseDouble(amountStr);
-            if (amount <= 0) {
-                throw new NumberFormatException("Amount must be positive.");
-            }
-        } catch (Exception e) {
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write("{\"status\":\"error\",\"message\":\"Invalid sale amount provided.\"}");
-            return;
-        }
+        String debitAccountName = "Cashbook";
+        if ("Online".equalsIgnoreCase(paymentStatus)) debitAccountName = "Bank A/c";
+        else if ("Unpaid".equalsIgnoreCase(paymentStatus)) debitAccountName = "Debtors";
 
-        if ("Unpaid".equalsIgnoreCase(paymentStatus) && (customerName == null || customerName.trim().isEmpty())) {
-            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            response.getWriter().write("{\"status\":\"error\",\"message\":\"Customer name is required for Accounts Receivable (A/R) transactions.\"}");
-            return;
-        }
-
-        // Map payment status to the target Debit Ledger Account
-        String debitAccountName;
-        if ("Cash".equalsIgnoreCase(paymentStatus)) {
-            debitAccountName = "Cashbook";
-        } else if ("Online".equalsIgnoreCase(paymentStatus)) {
-            debitAccountName = "Bank A/c";
-        } else if ("Unpaid".equalsIgnoreCase(paymentStatus)) {
-            debitAccountName = "Debtors";
-        } else {
-            debitAccountName = "Cashbook";
-        }
-
-        // Build readable ledger particulars
-        StringBuilder description = new StringBuilder();
-        description.append(category != null && !category.trim().isEmpty() ? category.trim() : "Service Sale");
-        if (customerName != null && !customerName.trim().isEmpty()) {
-            description.append(" - ").append(customerName.trim());
-        }
-        if (narration != null && !narration.trim().isEmpty()) {
-            description.append(" (").append(narration.trim()).append(")");
-        }
+        StringBuilder desc = new StringBuilder(category != null ? category.trim() : "Service Sale");
+        if (customerName != null && !customerName.isEmpty()) desc.append(" - ").append(customerName.trim());
+        if (narration != null && !narration.isEmpty()) desc.append(" (").append(narration.trim()).append(")");
 
         try (Connection conn = DatabaseHelper.getConnection()) {
-            // 1. Record Double-Entry Transaction: Dr Cashbook/Bank/Debtors, Cr Sales A/c
-            String ledgerSql = "INSERT INTO Transactions (debit_account_id, credit_account_id, amount, description, status) " +
-                    "VALUES ((SELECT account_id FROM Accounts WHERE account_name = ?), " +
-                    "(SELECT account_id FROM Accounts WHERE account_name = 'Sales A/c'), ?, ?, 'ACTIVE')";
+            
+            // Inject admin_id into the Transactions table
+            String ledgerSql = "INSERT INTO Transactions (debit_account_id, credit_account_id, amount, description, status, admin_id) " +
+                               "VALUES ((SELECT account_id FROM Accounts WHERE account_name = ?), " +
+                               "(SELECT account_id FROM Accounts WHERE account_name = 'Sales A/c'), ?, ?, 'ACTIVE', ?::uuid)";
             try (PreparedStatement stmt = conn.prepareStatement(ledgerSql)) {
                 stmt.setString(1, debitAccountName);
                 stmt.setDouble(2, amount);
-                stmt.setString(3, description.toString());
+                stmt.setString(3, desc.toString());
+                stmt.setString(4, adminId);
                 stmt.executeUpdate();
             }
 
-            // 2. If Accounts Receivable, upsert into Customers table
             if ("Unpaid".equalsIgnoreCase(paymentStatus)) {
-                CustomerManager.addCustomerDebt(conn, customerName, amount);
+                CustomerManager.addCustomerDebt(conn, customerName, amount, adminId);
             }
 
             response.setStatus(HttpServletResponse.SC_OK);
-            response.getWriter().write(
-                    "{\"status\":\"success\",\"message\":\"Sale recorded and posted to ledger.\",\"data\":{" +
-                            "\"category\":\"" + CustomerManager.escapeJson(category) + "\"," +
-                            "\"amount\":" + String.format("%.2f", amount) + "," +
-                            "\"debitAccount\":\"" + CustomerManager.escapeJson(debitAccountName) + "\"" +
-                            "}}"
-            );
+            response.getWriter().write("{\"status\":\"success\",\"message\":\"Sale recorded safely in your tenant space.\"}");
 
         } catch (Exception e) {
             e.printStackTrace();
